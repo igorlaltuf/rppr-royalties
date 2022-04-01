@@ -1,0 +1,1 @@
+# Scripts com os dados do artigo.

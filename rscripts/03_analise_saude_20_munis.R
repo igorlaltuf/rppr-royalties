@@ -48,7 +48,7 @@ cfm$codigo_ibge <- substr(cfm$codigo_ibge, 1, 6)
 cfm_muni_20 <- cfm$codigo_ibge
 
 
-dados_cfh <- dados.st %>% 
+estab_cfh <- dados.st %>% 
   dplyr::filter(nivate_h == 1, # sobre o atendimento: Tem atendimento hospitalar municipal ou estadual? exclui farmácias etc
                 tpgestao %in% c('M','E','D'), # M, E ou D (dupla) administração municipal, estadual ou dupla
                 vinc_sus == 1) %>%  # vinculados ao SUS
@@ -67,7 +67,7 @@ dados_cfh <- dados.st %>%
 
 
 
-dados_cfm <- dados.st %>% 
+estab_cfm <- dados.st %>% 
   dplyr::filter(nivate_h == 1, # sobre o atendimento: Tem atendimento hospitalar municipal ou estadual? exclui farmácias etc
                 tpgestao %in% c('M','E','D'), # M, E ou D (dupla) administração municipal, estadual ou dupla
                 vinc_sus == 1) %>%  # vinculados ao SUS
@@ -146,7 +146,165 @@ leitos_cfh <- dados.lt %>%
   select(muni, codufmun, ano_2008, ano_2018, saldo)
 
 
-# 5 - Quantidade de médicos-------------------------------------------------------------------------------------
+# 5 - Quantidade de médicos (todos os tipos) -------------------------------------------------------------------------------------
+
+cbo.2002 <- read.csv2('input/cbo_2002_ocupacao.csv') %>%   
+  janitor::clean_names() %>% 
+  dplyr::filter(codigo >= 225103 & # filtrar cargos de médicos independente da especialização
+                codigo <= 225355) %>% 
+  mutate(codigo = as.character(codigo)) 
+
+cbo.1994 <- read.csv2('input/cbo94-datasus.csv', encoding = 'UTF-8') %>%     
+  filter(str_detect(profissao, "Médico|Medicos")) 
+
+cbo.2007.10 <- read.csv2('input/cbo2007-10-conv.csv', encoding = 'UTF-8') 
+
+lista.de.arquivos <- list.files(path = "input/CNES-PF/", recursive = TRUE,
+                                pattern = "\\.dbc$", 
+                                full.names = TRUE)
+
+# dados do mês de dezembro para cada ano de 2006 a 2020
+# ano <- c(2006:2020)
+marc <- c(1:135)
+i <- 1
+while (i <= length(lista.de.arquivos)) {
+  #pop$cod_muni6 <- as.numeric(substr(pop$cod_muni,1,6))
+  
+  x <- read.dbc::read.dbc(lista.de.arquivos[i]) %>%  
+    janitor::clean_names() %>%
+    mutate(codufmun = as.character(codufmun),
+           tpgestao = as.character(tpgestao),
+           cbo = as.character(cbo),
+           prof_sus = as.numeric(as.character(prof_sus)),
+           competen = as.character(competen)) %>% 
+    mutate(ano = as.numeric(substr(competen,1,4))) %>% 
+    select(codufmun, ano, tpgestao, cbo, prof_sus)
+  
+  # classificação pela cbo94
+  ano.2006 <- x %>%
+    dplyr::filter(cbo %in% cbo.1994$cod_cbo_94) %>% # filtrar cargos de médicos independente da especialização
+    group_by(codufmun, ano) %>%
+    summarise(qtd_med_sus = sum(prof_sus)) %>%
+    left_join(pop, by = c('ano', 'codufmun' = 'cod_muni_6_dig')) %>%    
+    mutate(med_sus_100_mil_hab = (qtd_med_sus/populacao)*100000)
+  
+  # classificação segundo a Tabela de conversão da classificação Brasileira de Ocupações 
+  # disponibilizada pelo Ministério do Trabalho e Emprego (MTE).
+  # http://www.sbpc.org.br/upload/noticias_setor/320110927123631.pdf
+  anos2007.2010 <- x %>%
+    dplyr::filter(cbo %in% cbo.2007.10$cod_antigo) %>% # filtrar cargos de médicos independente da especialização
+    group_by(codufmun, ano) %>% # usar tpgestao aqui para saber os médicos do municipio, estado ou duplo
+    summarise(qtd_med_sus = sum(prof_sus)) %>%
+    left_join(pop, by = c('ano', 'codufmun' = 'cod_muni_6_dig')) %>%    
+    mutate(med_sus_100_mil_hab = (qtd_med_sus/populacao)*100000)
+  
+  anos2011.2020 <- x %>%
+    dplyr::filter(cbo %in% cbo.2002$codigo) %>% # filtrar cargos de médicos independente da especialização
+    group_by(codufmun, ano) %>%
+    summarise(qtd_med_sus = sum(prof_sus)) %>%
+    left_join(pop, by = c('ano', 'codufmun' = 'cod_muni_6_dig')) %>%   
+    mutate(med_sus_100_mil_hab = (qtd_med_sus/populacao)*100000)
+  
+  x <- rbind(ano.2006, anos2007.2010, anos2011.2020)
+  
+  assign(paste("cnes.pf",marc[i], sep="."), x)
+  i <- i + 1
+}
+
+dados <- do.call(rbind, lapply(paste0("cnes.pf.",1:135), get))
+
+medic_cfh <- dados %>% 
+  dplyr::filter(ano %in% c(2008,2018),
+                codufmun %in% cfh_muni_20) %>% 
+  select(codufmun, ano, muni, med_sus_100_mil_hab) %>% 
+  pivot_wider(names_from = ano, values_from = med_sus_100_mil_hab) %>% 
+  rename(ano_2018 = '2018',
+         ano_2008 = '2008') %>% 
+  mutate(saldo = ano_2018 - ano_2008)
+  
+
+medic_cfm <- dados %>% 
+  dplyr::filter(ano %in% c(2008,2018),
+                codufmun %in% cfm_muni_20) %>% 
+  select(codufmun, ano, muni, med_sus_100_mil_hab) %>% 
+  pivot_wider(names_from = ano, values_from = med_sus_100_mil_hab) %>% 
+  rename(ano_2018 = '2018',
+         ano_2008 = '2008') %>% 
+  mutate(saldo = ano_2018 - ano_2008)
+
+
+
+# 6 - Tabela síntese ------------------------------------------------------------------------------------------
+estab_cfm <- estab_cfm %>% 
+  rename('estab_2008' = ano_2008,
+         'estab_2018' = ano_2018,
+         'estab_saldo' = saldo)
+
+leitos_cfm <- leitos_cfm %>% 
+  rename('leitos_2008' = ano_2008,
+         'leitos_2018' = ano_2018,
+         'leitos_saldo' = saldo)
+
+medic_cfm <- medic_cfm %>% 
+  rename('medic_2008' = ano_2008,
+         'medic_2018' = ano_2018,
+         'medic_saldo' = saldo)
+
+cfm_sintese <- left_join(estab_cfm, leitos_cfm) %>% 
+  left_join(medic_cfm)
+
+write.csv2(cfm_sintese, file = 'output/sintese_cfm.csv', row.names = F)
+
+estab_cfh <- estab_cfh %>% 
+  rename('estab_2008' = ano_2008,
+         'estab_2018' = ano_2018,
+         'estab_saldo' = saldo)
+
+leitos_cfh <- leitos_cfh %>% 
+  rename('leitos_2008' = ano_2008,
+         'leitos_2018' = ano_2018,
+         'leitos_saldo' = saldo)
+
+medic_cfh <- medic_cfh %>% 
+  rename('medic_2008' = ano_2008,
+         'medic_2018' = ano_2018,
+         'medic_saldo' = saldo)
+
+cfh_sintese <- left_join(estab_cfh, leitos_cfh) %>% 
+  left_join(medic_cfh)
+
+write.csv2(cfh_sintese, file = 'output/sintese_cfh.csv', row.names = F)
+
+
+# 7 - Leitos de internação vinculados ao SUS
+# leitos_uti_2008 <- read.csv2('input/leitos_uti_2008.csv') %>% 
+#   janitor::clean_names() %>% 
+#   rename('leitos_uti_sus_2008' = quantidade_sus) %>% 
+#   mutate(ano = 2008) %>% 
+#   mutate(cod_ibge = substr(municipio, 1, 6)) %>% 
+#   left_join(pop, by = c('cod_ibge' = 'cod_muni_6_dig', 'ano')) %>% 
+#   mutate(leitos_uti_sus_2008_100_mil_hab = (leitos_uti_sus_2008/populacao)*100000) %>% 
+#   select(6,4,2,9)
+# 
+# leitos_uti_2018 <- read.csv2('input/leitos_uti_2018.csv')%>% 
+#   janitor::clean_names() %>% 
+#   rename('leitos_uti_sus_2018' = quantidade_sus) %>% 
+#   mutate(ano = 2018) %>% 
+#   mutate(cod_ibge = substr(municipio, 1, 6)) %>% 
+#   left_join(pop, by = c('cod_ibge' = 'cod_muni_6_dig', 'ano')) %>% 
+#   mutate(leitos_uti_sus_2018_100_mil_hab = (leitos_uti_sus_2018/populacao)*100000) %>% 
+#   select(6,4,2,9)
+# 
+# leitos_uti <- left_join(leitos_uti_2008, leitos_uti_2018) 
+# 
+#   mutate(cod_ibge = substr(municipio, 1, 6)) 
+#   
+
+
+
+
+
+
 
 
 
