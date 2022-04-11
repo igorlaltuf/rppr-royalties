@@ -6,6 +6,7 @@ input/CNES-PF
 input/despesas municipais 2013-2018
 input/caso_full.csv
 temp/*
+input/*
 input/00_base_escolas_2009_2020.csv
 input/00_base_matriculas_2009_2020.csv
 input/00_base_docentes_cfh_2009_2020
