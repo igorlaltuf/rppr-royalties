@@ -34,7 +34,7 @@ obito_ano <- dados %>%
 # evolução da taxa de mortalidade em teresópolis (mortalidade no transito a cada 100 mil habitantes)
 mort_transito <- ggplot(obito_ano) +
   aes(x = ano_obito, weight = obitos_100_mil_hab) +
-  geom_bar(fill = "#112446") +
+  geom_bar(fill = "grey") +
   labs(x = "Ano",
        y = "Taxa de Mortalidade por Acidentes de Transporte\na cada 100 mil habitantes") +
   theme_classic()
@@ -71,7 +71,7 @@ obito_ano <- dados %>%
 # evolução da taxa de mortalidade em teresópolis (mortalidade no transito a cada 100 mil habitantes)
 mort_transito <- ggplot(obito_ano) +
   aes(x = ano_obito, weight = obitos_100_mil_hab) +
-  geom_bar(fill = "#112446") +
+  geom_bar(fill = "grey") +
   labs(x = "Ano",
        y = "Taxa de Mortalidade por Acidentes de Transporte\na cada 100 mil habitantes") +
   theme_classic()
@@ -91,7 +91,7 @@ taxa_altamira <- motorizacao %>%
 
 motori_altamira <- ggplot(taxa_altamira) +
   aes(x = ano, weight = taxa_motorizacao) +
-  geom_bar(fill = "#112446") +
+  geom_bar(fill = "grey") +
   labs(x = "Ano",
        y = "Taxa de Motorização") +
   theme_classic() +
@@ -107,7 +107,7 @@ taxa_porto_velho <- motorizacao %>%
   
 motori_porto_velho <- ggplot(taxa_porto_velho) +
   aes(x = ano, weight = taxa_motorizacao) +
-  geom_bar(fill = "#112446") +
+  geom_bar(fill = "grey") +
   labs(x = "Ano",
        y = "Taxa de Motorização") +
   theme_classic() +
