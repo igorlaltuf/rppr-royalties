@@ -5,9 +5,9 @@ library(gt) # criar tabelas
 library(dotenv) # gerenciamento de credenciais base dos dados
 library(deflateBR) # deflacionar valores
 library(lubridate) # manipular datas
+library(sf) # Ler shapefiles
 library(geobr) # baixar shapes do IBGE
 library(basedosdados) # acessar dados da RAIS
-library(sf) # Ler shapefiles
 library(nngeo) # pacote para remover buracos quando uso st_union em shapefiles
 library(ggspatial) 
 library(RColorBrewer) #paleta de cores
